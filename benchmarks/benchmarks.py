@@ -1,3 +1,10 @@
+"""
+benchmarks.py
+=============
+
+The source code provides benchmarks for sklearn, regain and GGLasso implementations of ADMM.
+"""
+
 import sys
 import time
 import numpy as np
@@ -23,6 +30,20 @@ from regain.covariance import GraphicalLasso as rg_GL
 
 
 def network_generation(p=int, N=int, K=1, M=int):
+
+    """
+    Data generation using power networks.
+
+    Parameters
+    ----------
+
+    :param p: p - number of features to be generated
+    :param N: N - number of samples to be generated
+    :param K: K - number of Theta instances to be generated
+    :param M: M - number of subblocks of Kth instance
+    :return: numpy.array()
+    """
+
     Sigma, Theta = group_power_network(p, K=K, M=M)  # Theta is true precision matrix
     S, samples = sample_covariance_matrix(Sigma, N)
 
