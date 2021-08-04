@@ -37,7 +37,7 @@ class glasso_problem:
         * For GGL with non-conforming dimensions, use a list/dict of length K. Will be transformed to a dict with keys 1,..K.
         
         For MGL, each ``S[k]`` has to be symmetric and positive semidefinite.
-        Note: y default ``S`` will be scaled to correlations and scaled back after solving, see option ``do_scaling``.
+        Note: scaling ``S`` to correlations might be helpful, see option ``do_scaling``.
         
     N : int or integer array of length K
         Number of samples for each instance k=1,..,K.
@@ -70,12 +70,12 @@ class glasso_problem:
         See :ref:`Nonconforming GGL` on how to create G.
         
     do_scaling : boolean, optional
-        Whether to scale input S to correlations. The default is True.
-        If True, the output is re-scaled to covariances after solving. 
+        Whether to scale input S to correlations. The default is ``False``.
+        If ``True``, the output is re-scaled to covariances after solving. 
 
     """
     
-    def __init__(self, S, N, reg = "GGL", reg_params = None, latent = False, G = None, do_scaling = True):
+    def __init__(self, S, N, reg = "GGL", reg_params = None, latent = False, G = None, do_scaling = False):
         
         self.S = S.copy()
         self.N = N
@@ -291,6 +291,9 @@ class glasso_problem:
         solver_params['rho'] = 1.
         solver_params['max_iter'] = 1000
         
+        if self.conforming or not self.multiple:
+            solver_params['update_rho'] = True
+        
         return solver_params
         
     def set_reg_params(self, reg_params = None):
@@ -420,8 +423,9 @@ class glasso_problem:
  
         # rescale
         if self.do_scaling:
-            #print("Diagonal of solution before rescaling:", np.diag(sol['Theta']))
             sol['Theta'] = self._rescale_to_covariances(sol['Theta'], self._scale)
+            if self.latent:
+                sol['L'] = self._rescale_to_covariances(sol['L'], self._scale)
         
             
         # set the computed solution
@@ -501,7 +505,7 @@ class glasso_problem:
             Calls ``self.set_modelselect_params()``, see doc of this method for details.
         method : str, optional
             Method for choosing the best solution in the grid. 
-            Options are 'AIC' (Akaike Information criterion) and 'eBIC' (extended Bayesia information criterion)
+            Options are 'AIC' (Akaike Information criterion) and 'eBIC' (extended Bayesia information criterion).
             The default is 'eBIC'.
         gamma : float, optional
             Gamma value for eBIC. Should be between 0 and 1. The larger gamma, the more eBIC tends to pick sparse solutions. 
@@ -585,9 +589,9 @@ class glasso_problem:
             
         # rescale
         if self.do_scaling:
-            #print("Diagonal of solution before rescaling:", np.diag(sol['Theta']))
             sol['Theta'] = self._rescale_to_covariances(sol['Theta'], self._scale)
-        
+            if self.latent:
+                sol['L'] = self._rescale_to_covariances(sol['L'], self._scale)
             
         # set the computed solution
         if self.latent:
@@ -684,15 +688,15 @@ class GGLassoEstimator(BaseEstimator):
         
         return self.ebic_
     
-    def calc_adjacency(self):
+    def calc_adjacency(self, t = 1e-8):
         
         if self.conforming:
-            self.adjacency_ = adjacency_matrix(S = self.precision_, t = 1e-5)
+            self.adjacency_ = adjacency_matrix(S = self.precision_, t = t)
         
         else:
             self.adjacency_ = dict()
             for k in range(self.K):
-                self.adjacency_[k] = adjacency_matrix(S = self.precision_[k], t = 1e-5)
+                self.adjacency_[k] = adjacency_matrix(S = self.precision_[k], t = t)
             
         return 
         

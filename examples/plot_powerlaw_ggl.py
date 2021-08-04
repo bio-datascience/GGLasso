@@ -21,12 +21,12 @@ from gglasso.helper.model_selection import aic, ebic
 
 p = 100
 K = 5
-N = 5000
+N = 80
 M = 10
 
 reg = 'GGL'
 
-Sigma, Theta = group_power_network(p, K, M, nxseed = 2340)
+Sigma, Theta = group_power_network(p, K, M, scale = False, nxseed = 2340)
 
 S, sample = sample_covariance_matrix(Sigma, N)
 
@@ -40,7 +40,7 @@ S, sample = sample_covariance_matrix(Sigma, N)
 #
 #
 
-L1, L2, W2 = lambda_grid(num1 = 3, num2 = 9, reg = reg)
+L1, L2, W2 = lambda_grid(num1 = 3, num2 = 10, reg = reg)
 grid1 = L1.shape[0]; grid2 = L2.shape[1]
 
 ERR = np.zeros((grid1, grid2))
@@ -100,7 +100,7 @@ print("Optimal lambda values: (l1,l2) = ", (l1opt,l2opt))
 #
 #
 
-ALPHA = 2*np.logspace(start = -1, stop = -3, num = 20, base = 10)
+ALPHA = np.logspace(start = 0, stop = -1.5, num = 15, base = 10)
 
 FPR_GL = np.zeros(len(ALPHA))
 TPR_GL = np.zeros(len(ALPHA))
@@ -108,7 +108,7 @@ DFPR_GL = np.zeros(len(ALPHA))
 DTPR_GL = np.zeros(len(ALPHA))
 
 for a in np.arange(len(ALPHA)):
-    singleGL = GraphicalLasso(alpha = ALPHA[a], tol = 1e-6, max_iter = 200, verbose = False)
+    singleGL = GraphicalLasso(alpha = ALPHA[a], tol = 1e-4, max_iter = 50, verbose = False)
     singleGL_sol = np.zeros((K,p,p))
     for k in np.arange(K):
         model = singleGL.fit(sample[k,:,:].T)
@@ -131,6 +131,7 @@ for a in np.arange(len(ALPHA)):
 Omega_0 = get_K_identity(K,p)
 solA, infoA = ADMM_MGL(S, l1opt, l2opt, reg , Omega_0, tol = 1e-10, rtol = 1e-10, verbose = True, measure = True)
 
+
 # %%
 # Plotting: TPR, FPR, differential edges
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -140,7 +141,9 @@ solA, infoA = ADMM_MGL(S, l1opt, l2opt, reg , Omega_0, tol = 1e-10, rtol = 1e-10
 # 
 # Differential edges are edges which are present in at least one but not all of the K precision matrices.
    
-plot_fpr_tpr(FPR, TPR, ix, ix2, FPR_GL, TPR_GL, W2)
+fig,ax = plot_fpr_tpr(FPR, TPR, ix, ix2, FPR_GL, TPR_GL, W2)
+ax.set_xlim(-0.01, 0.1)
+ax.set_ylim(0.3,1)
 
-plot_diff_fpr_tpr(DFPR, DTPR, ix, ix2, DFPR_GL, DTPR_GL, W2)
+fig,ax = plot_diff_fpr_tpr(DFPR, DTPR, ix, ix2, DFPR_GL, DTPR_GL, W2)
 

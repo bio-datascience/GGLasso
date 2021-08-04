@@ -21,7 +21,7 @@ def prox_od_1norm(A, l):
     """
     
     (d1,d2) = A.shape
-    res = np.sign(A) * np.maximum(np.abs(A) - l, 0)
+    res = np.sign(A) * np.maximum(np.abs(A) - l, 0.)
     
     for i in np.arange(np.minimum(d1,d2)):
         res[i,i] = A[i,i]
@@ -35,7 +35,7 @@ def prox_rank_norm(A, beta, D = np.array([]), Q = np.array([])):
         D, Q = np.linalg.eigh(A)
         print("Single eigendecomposition is executed in prox_rank_norm")
     
-    B = (Q * np.maximum(D-beta, 0))@Q.T
+    B = (Q * np.maximum(D-beta, 0.))@Q.T
     return B
 
 @njit()          
@@ -326,9 +326,10 @@ def phiminus(beta, D, Q):
 
 @njit() 
 def moreau_h(beta, D, Q):
-    # returns the Moreau_Yosida reg. value as well as the proximal map of beta*h
-    # D: array (p,p)
-    # Q: array (p,p)
+    """returns the Moreau_Yosida reg. value as well as the proximal map of beta*h
+    D: array (p,p)
+    Q: array (p,p)
+    """
     
     pp = phiplus(beta, D, Q)
     pm = phiminus(beta, D, Q)
@@ -336,7 +337,8 @@ def moreau_h(beta, D, Q):
     return psi, pp, pm
 
 
-@njit() 
+#@njit()
+# tile is not numba supported, could be replaced by repeat+reshape
 def construct_gamma(A, beta, D = np.array([]), Q = np.array([])):
     (K,p,p) = A.shape
     Gamma = np.zeros((K,p,p))
@@ -347,12 +349,20 @@ def construct_gamma(A, beta, D = np.array([]), Q = np.array([])):
     for k in np.arange(K):
         phip_d = phip(D[k,:] , beta) 
         
-        for i in np.arange(p):
-            for j in np.arange(p):    
+        # for i in np.arange(p):
+        #     for j in np.arange(p):    
                 
-                denom = np.sqrt(D[k,i]**2 + 4* beta) + np.sqrt(D[k,j]**2 + 4* beta)
-                Gamma[k,i,j] = (phip_d[i] + phip_d[j]) / denom
-                      
+        #         denom = np.sqrt(D[k,i]**2 + 4* beta) + np.sqrt(D[k,j]**2 + 4* beta)
+        #         Gamma[k,i,j] = (phip_d[i] + phip_d[j]) / denom
+            
+        h1 = np.tile(np.sqrt(D[k,:]**2 + 4* beta), (p,1))
+        h1 = h1 + h1.T 
+        
+        h2 = np.tile(phip_d, (p,1))
+        h2 = h2 + h2.T 
+        
+        Gamma[k,:,:] =  h2/h1
+        
     return Gamma
 
 # old version

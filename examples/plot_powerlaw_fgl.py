@@ -3,7 +3,7 @@ Fused Graphical Lasso experiment
 =================================
 
 We investigate the performance of Fused Graphical Lasso on powerlaw networks, compared to estimating the precision matrices independently with SGL.
-In particular, we demonstrate that FGL - in contrast to - is capable of estimating time-consistent precision matrices.
+In particular, we demonstrate that FGL - in contrast to SGL - is capable of estimating time-consistent precision matrices.
 
 We generate a precision matrix with block-wise powerlaw networks. 
 At time K=5, one of the blocks disappears and another block appears. A third block decays exponentially over time (indexed by K).
@@ -11,7 +11,6 @@ At time K=5, one of the blocks disappears and another block appears. A third blo
 
 # sphinx_gallery_thumbnail_number = 2
 
-from time import time
 import numpy as np
 from sklearn.covariance import GraphicalLasso
 from regain.covariance import TimeGraphicalLasso
@@ -32,7 +31,7 @@ L = int(p/M)
 
 reg = 'FGL'
 
-Sigma, Theta = time_varying_power_network(p, K, M, nxseed = 2340)
+Sigma, Theta = time_varying_power_network(p, K, M, scale = False, nxseed = 2340)
 
 S, sample = sample_covariance_matrix(Sigma, N)
 
@@ -48,19 +47,6 @@ results['truth'] = {'Theta' : Theta}
 
 anim = single_heatmap_animation(Theta)
 
-# import matplotlib.animation as animation
-# import matplotlib.pyplot as plt
-
-# def _update_line(num):
-#     line.set_data(data[..., :num])
-#     return line,
-
-
-# fig, ax = plt.subplots()
-# data = np.random.RandomState(0).rand(2, 25)
-# line, = ax.plot([], [], 'r-')
-# ax.set(xlim=(0, 1), ylim=(0, 1))
-# ani = animation.FuncAnimation(fig, _update_line, 25, interval=100, blit=True)
 
 # %%
 #  Parameter selection (FGL)
@@ -137,7 +123,7 @@ all_res = list()
 
 for j in range(len(ALPHA)):
     res = np.zeros((K,p,p))
-    singleGL = GraphicalLasso(alpha = ALPHA[j], tol = 1e-6, max_iter = 200, verbose = False)
+    singleGL = GraphicalLasso(alpha = ALPHA[j], tol = 1e-3, max_iter = 20, verbose = False)
     for k in np.arange(K):
         model = singleGL.fit(sample[k,:,:].T)
         res[k,:,:] = model.precision_
@@ -154,31 +140,27 @@ results['SGL'] = {'Theta' : all_res[ix_SGL]}
 
 Omega_0 = get_K_identity(K,p)
 
-start = time()
-sol, info = ADMM_MGL(S, l1opt, l2opt, reg, Omega_0, rho = 1, max_iter = 1000, \
+sol, info = ADMM_MGL(S, l1opt, l2opt, reg, Omega_0, rho = 1, max_iter = 500, \
                                                         tol = 1e-10, rtol = 1e-10, verbose = False, measure = True)
-end = time()
 
-print(f"Running time for ADMM was {end-start} seconds.")
 
 results['ADMM'] = {'Theta' : sol['Theta']}
 
 # %%
 #  Solve with regain
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-# regain needs data in format (N*K,p)
-# regain has TV penalty also on the diagonal, hence results may be slightly different than ADMM_MGL
+#
+# ``regain`` needs data in format (N*K,p).
+# ``regain`` includes the TV penalty also on the diagonal, hence results may be slightly different than ``ADMM_MGL``.
 
 tmp = sample.transpose(1,0,2).reshape(p,-1).T
 
-start = time()
+
 ltgl = TimeGraphicalLasso(alpha = N*l1opt, beta = N*l2opt  , psi = 'l1', \
                           rho = 1., tol = 1e-10, rtol = 1e-10,  max_iter = 500, verbose = False)
 ltgl = ltgl.fit(X = tmp, y = np.repeat(np.arange(K),N))
-end = time()
 
-print(f"Running time for LTGL was {end-start} seconds.")
+
 
 results['LTGL'] = {'Theta' : ltgl.precision_}
 
@@ -200,6 +182,7 @@ results['LTGL'] = {'Theta' : ltgl.precision_}
 Theta_admm = results.get('ADMM').get('Theta')
 Theta_ltgl = results.get('LTGL').get('Theta')
 Theta_sgl = results.get('SGL').get('Theta')
+
 
 
 print("Norm(Regain-ADMM)/Norm(ADMM):", np.linalg.norm(Theta_ltgl - Theta_admm)/ np.linalg.norm(Theta_admm))
